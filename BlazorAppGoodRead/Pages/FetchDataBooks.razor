@@ -1,0 +1,73 @@
+﻿@page "/goodreader"
+@inject NavigationManager Navigation
+
+<PageTitle>Indicação de Leitura</PageTitle>
+
+<h1>Indicação de Leitura</h1>
+
+<p>
+    This component demonstrates fetching data from the server.
+    <button @onclick="SendAsync">Atualizar!</button>
+</p>
+
+<hr>
+
+<ul id="messagesList">
+    @foreach (var myboks in books)
+    {
+        <li>@myboks.Autor: @myboks.Title</li>
+    }
+</ul>
+
+
+
+@code {
+    private HubConnection? hubConnection;
+    private List<Book> books = new List<Book>();
+    private readonly HttpClient _httpClient = new HttpClient();
+    //private Book[]? books;
+
+    private readonly string functionAppBaseUri = "http://localhost:7157/api/";
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(functionAppBaseUri)
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<Book>("myFavoriteBooks", (myFavoriteBooks) =>
+        {
+            books.Add(myFavoriteBooks);
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+        Console.WriteLine($"Hub conectado? {IsConnected}");
+
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    async Task SendAsync()
+    {
+        await _httpClient.GetAsync($"{functionAppBaseUri}goodreads"); // post to the function app
+        StateHasChanged(); //update the UI
+    }
+
+    // protected override async Task OnInitializedAsync()
+    // {
+    //     books = await Http.GetFromJsonAsync<Book[]>("http://localhost:7071/api");
+    // }
+
+    public class Book
+    {
+        public string ImagePath { get; set; }
+
+        public string Title { get; set; }
+
+        public string Autor { get; set; }
+    }
+
+}

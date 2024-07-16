@@ -1,0 +1,82 @@
+﻿@page "/"
+
+<h3>Indicações de Leitura</h3>
+<p><button @onclick="SendAsync" disabled="@(!IsConnected)">@hubConnection.State: Atualizar</button></p>
+
+<hr>
+
+@if (myBooks == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Titulo</th>
+                <th>Autor</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var myBook in myBooks)
+            {
+                <tr>
+                    <td><img src="@myBook.ImagePath" style="height:90px" /></td>
+                    <td>@myBook.Title</td>
+                    <td>@myBook.Autor</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private HubConnection hubConnection;
+    private List<Book> myBooks = new List<Book>();
+    private readonly HttpClient _httpClient = new HttpClient();
+    private readonly string functionAppBaseUri = "http://localhost:7157/api";
+    //private readonly string functionAppBaseUri = "https://functionapphttptrigger.service.signalr.net/api";
+
+    protected override async Task OnInitializedAsync() //actions to do when the page is initialized
+    {
+        //create a hub connection to the function app as we'll go via the function for everything SignalR.
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(functionAppBaseUri)
+            .Build();
+
+        //Registers handler that will be invoked when the hub method with the specified method name is invoked.
+        hubConnection.On<List<Book>>("myFavoriteBooks", (myFavoriteBooks) =>
+        {
+            myBooks.Clear();
+            foreach(var book in myFavoriteBooks)
+            {
+                myBooks.Add(book);
+            }
+            StateHasChanged(); //This tells Blazor that the UI needs to be updated
+        });
+
+        await hubConnection.StartAsync(); //start connection!
+    }
+
+    async Task SendAsync()
+    {
+        await _httpClient.GetAsync($"{functionAppBaseUri}/booklist"); // post to the function app
+        StateHasChanged(); //update the UI
+    }
+
+    //Check we're connected
+    public bool IsConnected =>
+        hubConnection.State == HubConnectionState.Connected;
+
+
+    public class Book
+    {
+        public string ImagePath { get; set; }
+
+        public string Title { get; set; }
+
+        public string Autor { get; set; }
+    }
+}
